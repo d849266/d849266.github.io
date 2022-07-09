@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>
+    C Notes
+  </title>
+</head>
+
+<body>
+  <header>
+    <h1>
+      C Notes
+    </h1>
+  </header>
+
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="cnotes.html">C Notes</a>
+  </nav>
+
+  <div id="c01">
+    <h2>
+      01. Declare function returning pointer to array size N of type T
+    </h2>
+
+    <pre>
+    T (* f(void))[N]
+    {
+      static T a[N];
+      return &a;
+    }
+  </pre>
+
+    <p>Alternative</p>
+
+    <pre>
+    typedef T array[N];
+
+    array* f(void)
+    {
+      static array a;
+      return &a;
+    }
+  </pre>
+
+    <p>Usage</p>
+
+    <pre>
+    (*f())[i] = 42;
+  </pre>
+  </div>
+
+  <div id="footer">
+    <hr>
+    <footer>
+      Created 2022 by <a href="mailto:d849266@gmail.com">Daniel</a>
+    </footer>
+  </div>
+
+</body>
+
+</html>
