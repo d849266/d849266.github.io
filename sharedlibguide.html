@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Guide to Shared Libs</title>
+  </head>
+
+  <body>
+    <header>
+      <h1>Shared Lib Guide</h1>
+    </header>
+
+    <div id="guidesharedlib">
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="cnotes.html">C Notes</a>
+      </nav>
+    </div>
+
+    <div id="guide">
+      <h1 id="abasicguidetosharedlibrariesincc">
+        A BASIC GUIDE TO SHARED LIBRARIES IN C &amp; C#
+      </h1>
+
+      <h2 id="createasharedobjectfilewithclangc">
+        CREATE A SHARED OBJECT FILE WITH CLANG (C)
+      </h2>
+
+      <hr />
+
+      <p>
+        A shared object file (e.g., mylib.dll or mylib.so) is compiled code that
+        you can access &amp; use during your program's execution.
+      </p>
+
+      <p>
+        We now want to compile the C source code below into a shared object
+        file.
+      </p>
+
+      <pre><code class="c language-c">/* mylib.c */
+#include &lt;stdio.h&gt;
+
+extern void print_hello(void)
+{
+  puts("Hello World!");
+}
+</code></pre>
+
+      <p>
+        To compile &amp; link to a (dynamically linkable) shared object file in
+        Linux, do
+      </p>
+
+      <p><code>clang -fpic -shared mylib.c -o mylib.so</code></p>
+
+      <p>Alternatively, you can also compile and then link, doing</p>
+
+      <p><code>clang -c -fpic mylib.c</code></p>
+
+      <p>and</p>
+
+      <p><code>clang -shared mylib.o -o mylib.so</code></p>
+
+      <pre><code>The compiler flag `-fpic` makes your code position independent or relocatable.
+Thus, "fpic" stands for "position independent code".
+Programs or processes only know their own addresses.
+So, if you don't include `-fpic`, your library function `print_hello()` is out of reach within another process.
+Another way to grasp `-fpic` is to think of it as a "placeholder mechanism" for memory addresses.
+
+Your operating system's program loader sets the final addresses for you via the "placeholder addresses" from `-fpic`.
+
+The `-shared` flag tells your compiler to produce a shared object file (e.g., mylib.dll or mylib.so).
+</code></pre>
+
+      <p>Now we have a shared library file named <code>mylib.so</code>.</p>
+
+      <h2 id="usecfunctionsfromasharedobjectinc">
+        USE C FUNCTIONS FROM A SHARED OBJECT IN C#
+      </h2>
+
+      <p>
+        You can access the <code>print_hello</code> function from
+        <code>mylib.so</code> within another C program.
+      </p>
+
+      <p>For this, you need these Linux operating system functions</p>
+
+      <ul>
+        <li><code>dlopen</code> (loads shared object file)</li>
+
+        <li><code>dlsym</code> (returns function addresses)</li>
+
+        <li><code>dlclose</code> (unloads shared object)</li>
+      </ul>
+
+      <p>
+        You also need to include the <code>dlfcn.h</code> header and use the
+        above Linux operating system functions like so
+      </p>
+
+      <pre><code class="c language-c">/* myapp.c */
+#include &lt;stddef.h&gt;
+#include &lt;stdio.h&gt;
+
+#include &lt;dlfcn.h&gt;
+
+int main()
+{
+    typedef void (* Function_ptr)(void);
+    void* handle = NULL;
+    Function_ptr ptr_to_print_hello = NULL;
+
+    handle = dlopen("./mylib.so", RTLD_LAZY);
+
+    ptr_to_print_hello = (Function_ptr)dlsym(handle, "print_hello");
+
+    ptr_to_print_hello(); /* Hello World! */
+
+    dlclose(handle);
+}
+</code></pre>
+
+      <p>Compile &amp; link that via</p>
+
+      <p><code>clang myapp.c -ldl -o app</code></p>
+
+      <pre><code>To tell the linker to look for the shared object file, we use the `-ldl` flag.
+</code></pre>
+
+      <p>Then run it. We (should) get</p>
+
+      <p><code>Hello World!</code></p>
+
+      <h2 id="usecfunctionsfromasharedobjectinc-1">
+        USE C FUNCTIONS FROM A SHARED OBJECT IN C
+      </h2>
+
+      <p>
+        You can access the <code>print_hello</code> function from
+        <code>mylib.so</code> in C#.
+      </p>
+
+      <p>
+        For this, you need to tell C# how to deal with C functions (i.e.,
+        <code>print_hello</code>). We have also a word for that, it is
+        "marshalling".
+      </p>
+
+      <p>
+        To marshall C's <code>print_hello</code> (from <code>mylib.so</code>)
+        for C#, do
+      </p>
+
+      <pre><code class="cs language-cs">// myapp.cs
+using System;
+using System.Runtime.InteropServices;
+
+internal static class FFI
+{
+  [DllImport("mylib.so", CallingConvention = CallingConvention.Cdecl)]
+  internal static extern void print_hello();
+}
+
+public class TestFFI
+{
+  public static void Main(string[] args)
+  {
+    FFI.print_hello();
+  }
+}
+</code></pre>
+
+      <p>Then compile it with Mono, doing</p>
+
+      <p><code>mcs myapp.cs</code></p>
+
+      <p>Finally, run it via</p>
+
+      <p><code>mono myapp.exe</code></p>
+
+      <p>You should get</p>
+
+      <pre><code>Hello World!
+</code></pre>
+
+      <h2 id="words">WORDS</h2>
+
+      <hr />
+
+      <ol>
+        <li>
+          <p>
+            <strong>Handle:</strong>
+            <em
+              >You typically use an handle to indirectly refer to a programming
+              resource (e.g., a global object) managed by the implementation.
+              Pointers (and references), on the other hand, enable you to use
+              the resources (pointees) directly. Example:
+              <code>int fd = open(...);</code> Where <code>fd</code> is a file
+              handle managed by the operating system.</em
+            >
+          </p>
+        </li>
+
+        <li>
+          <p>
+            <strong>Foreign function interface (FFI):</strong>
+            <em
+              >A feature which makes it possible to call &amp; use functions
+              from one programming language (e.g., C) within another programming
+              language (e.g., C#).</em
+            >
+          </p>
+        </li>
+
+        <li>
+          <p>
+            <strong>to marshall:</strong>
+            <em>To arrange or make it ready for use.</em>
+          </p>
+        </li>
+      </ol>
+
+      <h2 id="references">REFERENCES</h2>
+
+      <hr />
+
+      <ol>
+        <li>
+          <a
+            href="https://docs.microsoft.com/en-us/dotnet/standard/native-interop/best-practices"
+            >Native interoperability best practices (Microsoft)</a
+          >
+        </li>
+
+        <li>
+          <a href="https://en.wikipedia.org/wiki/Foreign_function_interface"
+            >Foreign function interface (Wikipedia)</a
+          >
+        </li>
+
+        <li>
+          <a href="https://en.wikipedia.org/wiki/Handle_%28computing%29"
+            >Handle (Wikipedia)</a
+          >
+        </li>
+
+        <li>Linux Man Pages</li>
+
+        <li>
+          <a href="https://clang.llvm.org/docs/UsersManual.html"
+            >Clang Compiler User Manual</a
+          >
+        </li>
+
+        <li>
+          <a href="https://gcc.gnu.org/onlinedocs/gcc/"
+            >Using the GNU Compiler Collection (GCC)</a
+          >
+        </li>
+
+        <li>
+          <a
+            href="https://web.archive.org/web/20160315011254/http://www.greyhat.ch/lab/downloads/pic.html"
+            >Position Independent Code on i386 -- what is it, why is it needed,
+            how to write, how to exploit</a
+          >
+        </li>
+      </ol>
+
+      <hr />
+    </div>
+
+    <div id="footer">
+      <hr />
+      <footer>
+        Created 2022 by <a href="mailto:d849266@gmail.com">Daniel</a>
+      </footer>
+    </div>
+  </body>
+</html>
